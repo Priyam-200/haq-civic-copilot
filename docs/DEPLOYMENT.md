@@ -15,7 +15,27 @@ The image was built and tested locally (API, UI, live feeds and OCR all worked i
    `.gitignore` already excludes `.env`, `node_modules`, `data/` and `dist/`. **Check that `backend/.env` is not in the commit** (`git ls-files | grep .env` should only show `.env.example`).
 2. Have your Gemini API key ready. **Never commit it.** Set it as a secret in the host’s dashboard.
 
-## Option A — Render (easiest)
+## Recommended: website on Vercel + AI backend on Render
+
+**Why two hosts?** Vercel runs short, stateless functions with a read-only disk and a size limit of about 250 MB. Haq's backend
+needs a persistent document database, OCR and speech libraries, and an agent that runs for 30–60 s, so it runs as a container on
+Render. Vercel hosts the website (static files) and talks to the backend over HTTPS.
+
+1. **Backend on Render** — render.com → **New → Blueprint** → choose this repository (it reads `render.yaml`).
+   When asked for `GEMINI_API_KEY`, paste your own key (it stays in Render, never in GitHub). Deploy and copy the service URL,
+   e.g. `https://haq-backend.onrender.com`. Check `<url>/health` shows `"ai_configured": true`.
+2. **Website on Vercel** — vercel.com → **Add New → Project** → import this repository and set
+   * **Root Directory:** `frontend` (Framework Preset: Vite is detected automatically)
+   * **Environment Variable:** `VITE_API_URL` = the Render URL from step 1 (no trailing slash)
+
+   Deploy. Open the Vercel URL; the page should load without a red "cannot reach the server" banner.
+3. After changing `VITE_API_URL` in Vercel, **redeploy** (it is baked in at build time).
+
+Notes: Render's free plan sleeps after inactivity (the first request takes about a minute to wake it) and its disk is wiped on
+restart, so re-import your demo documents shortly before judging. The same image also serves the full website, so the Render URL
+alone is a complete fallback if Vercel is unavailable.
+
+## Option A (one host, no Vercel) — Render (easiest)
 1. render.com → **New → Web Service** → connect the GitHub repo.
 2. Runtime: **Docker** (it finds the `Dockerfile` in the repo root). Instance: free or Starter.
 3. Environment variables:

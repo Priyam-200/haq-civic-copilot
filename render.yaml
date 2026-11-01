@@ -1,0 +1,19 @@
+# Render blueprint: runs the Docker image (API + OCR + speech) as a web service.
+# Render dashboard -> New -> Blueprint -> pick this repository. The only thing to enter by hand is the secret key.
+services:
+  - type: web
+    name: haq-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false            # secret: paste your own key in the Render dashboard, it is never stored in this repo
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3-flash-preview,gemini-3.1-flash-lite,gemini-flash-lite-latest
+      - key: CORS_ORIGINS
+        value: "*"
