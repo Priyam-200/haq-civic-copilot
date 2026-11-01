@@ -135,6 +135,12 @@ Each result is verified (all keys present, every `{placeholder}` kept) and `test
 translations**: ask a native speaker to review them (especially legal and scheme wording) before a public launch. To change a
 sentence, edit it in the language's JSON file, or edit `English.json` and re-run the tool with `--force`.
 
+## Speed note: AI "thinking"
+The Gemini models "think" before answering, which by default takes 10–40 s per call; the agent makes about 10 calls per run. Haq switches
+thinking off (or to LOW for models that refuse "off") for all its AI calls and remembers what each model accepts, which brings an
+agent run from over a minute to about 20 s with unchanged measured accuracy. Set `LLM_THINKING=default` to restore the models'
+own behaviour.
+
 ## Tests
 ```bash
 cd backend && pytest tests -q

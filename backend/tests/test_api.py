@@ -342,3 +342,38 @@ def test_a_condition_that_needs_missing_information_can_never_make_someone_not_e
     monkeypatch.setattr(g, "ask_llm", violated)
     res = _events(client.post("/agent/run", json={"text": "farmer in Bihar", "live": False, "doc_ids": [doc_id]}))[-1]
     assert next(x for x in res["results"] if x["doc_id"] == doc_id)["verdict"] == "not_eligible"
+
+
+def test_ai_client_turns_thinking_off_learns_what_each_model_accepts(monkeypatch):
+    """The AI's default 'thinking' made calls take 10-40 s. It is switched off (or LOW for models that refuse 'off'),
+    and what a model accepts is remembered so later calls do not retry."""
+    import llm.client as lc
+    lc._cooldown.clear()
+    lc._think_mode.clear()
+    monkeypatch.setattr(lc, "THINKING", "fast")
+    monkeypatch.setattr(lc, "MODEL", "picky-model")
+    monkeypatch.setattr(lc, "FALLBACKS", [])
+    seen = []
+
+    class Resp:
+        text = "hi"
+
+    class Models:
+        def generate_content(self, model, contents, config):
+            tc = config.thinking_config
+            seen.append("off" if tc is not None and tc.thinking_budget == 0 else "low" if tc is not None else "default")
+            if tc is not None and tc.thinking_budget == 0:
+                raise RuntimeError("400 INVALID_ARGUMENT: Request contains an invalid argument.")
+            return Resp()
+    monkeypatch.setattr(lc, "client", type("Cl", (), {"models": Models()})())
+    assert lc.ask_llm("a") == "hi" and seen == ["off", "low"]          # 'off' refused, 'low' accepted
+    assert lc._think_mode == {"picky-model": "low"}
+    seen.clear()
+    assert lc.ask_llm("b") == "hi" and seen == ["low"]                  # remembered: no more retrying 'off'
+    lc._think_mode.clear()
+    monkeypatch.setattr(lc, "THINKING", "default")                      # the escape hatch keeps the models' own thinking
+    seen.clear()
+    lc.ask_llm("c")
+    assert seen == ["default"]
+    lc._cooldown.clear()
+    lc._think_mode.clear()

@@ -43,12 +43,37 @@ def _cool(model: str, error: str):
     _cooldown[model] = time.time() + secs
 
 
+# The models "think" before answering. By default that takes 10-40 s per call, and the agent makes ~10 calls per run.
+# These tasks (extraction, translation, answering from given text) do not need it, so it is switched off - or set to
+# LOW for models that refuse "off". What each model accepts is learned once and remembered.
+THINKING = os.getenv("LLM_THINKING", "fast")        # "default" keeps the models' own (slow) thinking
+_think_mode = {}                                    # model -> "off" | "low" | "default"
+
+
+def _config(json_mode: bool, mode: str):
+    kw = dict(response_mime_type="application/json" if json_mode else "text/plain", temperature=0)
+    if mode == "off":
+        kw["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+    elif mode == "low":
+        kw["thinking_config"] = types.ThinkingConfig(thinking_level="LOW")
+    return types.GenerateContentConfig(**kw)
+
+
+def _generate(model: str, prompt, json_mode: bool):
+    modes = ["default"] if THINKING == "default" else ([_think_mode[model]] if model in _think_mode else ["off", "low", "default"])
+    for mode in modes:
+        try:
+            resp = client.models.generate_content(model=model, contents=prompt, config=_config(json_mode, mode))
+            _think_mode[model] = mode
+            return resp
+        except Exception as e:
+            if "INVALID_ARGUMENT" in str(e) and mode != "default" and len(modes) > 1:
+                continue                            # this model refuses that thinking setting: try the next one
+            raise
+
+
 def ask_llm(prompt: str, rounds: int = 3, json_mode: bool = False) -> str:
     _need_client()
-    config = types.GenerateContentConfig(
-        response_mime_type="application/json" if json_mode else "text/plain",
-        temperature=0,
-    )
     models = [MODEL] + FALLBACKS
     last = None
     for r in range(rounds):                 # go through all models, then wait
@@ -56,7 +81,7 @@ def ask_llm(prompt: str, rounds: int = 3, json_mode: bool = False) -> str:
         usable = [m for m in models if _cooldown.get(m, 0) <= now] or models   # never end up with none
         for model in usable:
             try:
-                resp = client.models.generate_content(model=model, contents=prompt, config=config)
+                resp = _generate(model, prompt, json_mode)
                 if not resp.text:
                     raise RuntimeError("Model returned empty text")
                 return resp.text
