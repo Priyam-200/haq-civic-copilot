@@ -125,7 +125,21 @@ function Shell() {
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
-    api.health().then(setHealth).catch(() => setOffline(true));
+    // A free-tier backend sleeps when idle and needs up to a minute to wake: retry before showing the offline notice.
+    let stop = false;
+    const tries = 14;
+    const attempt = (n) =>
+      api.health().then((h) => {
+        if (stop) return;
+        setHealth(h);
+        setOffline(false);
+      }).catch(() => {
+        if (stop) return;
+        if (n + 1 >= tries) setOffline(true);
+        else setTimeout(() => attempt(n + 1), 5000);
+      });
+    attempt(0);
+    return () => { stop = true; };
   }, []);
 
   const docMatch = route.match(/^\/doc\/([\w-]+)/);
