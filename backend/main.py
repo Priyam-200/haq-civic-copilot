@@ -153,6 +153,34 @@ def ingest_url(body: UrlIn):
     return _ingest(pages, body.title or title, "web", url)
 
 
+SEED_KEYS = [k for k in os.getenv("SEED_CATALOG", "pm-kisan,pmuy").split(",") if k.strip()]
+
+
+def _seed_catalog():
+    """The free host wipes its disk on every restart. Re-import the key scheme documents in the
+    background so the library is never empty and document links keep working."""
+    import threading
+
+    def run():
+        for c in CATALOG:
+            if c["key"] not in SEED_KEYS or db.find_by_url(c["url"]):
+                continue
+            try:
+                title, pages, _ = load_url(c["url"])
+                ingest_pages(pages, title, "web", c["url"])
+                print(f"[seed] imported {c['key']}")
+            except Exception as e:
+                print(f"[seed] could not import {c['key']}: {str(e)[:120]}")
+
+    if llm.configured():
+        threading.Thread(target=run, daemon=True).start()
+
+
+@app.on_event("startup")
+def _on_startup():
+    _seed_catalog()
+
+
 @app.get("/sources/catalog")
 def source_catalog():
     """Official scheme documents that can be imported with one click (or fetched by the agent)."""

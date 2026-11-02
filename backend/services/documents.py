@@ -1,3 +1,4 @@
+import hashlib
 import re
 import uuid
 
@@ -22,7 +23,8 @@ def _relabel_unstructured(chunks):
 def ingest_pages(pages, title, source_type, source_url=None):
     if not any(p["text"] for p in pages):
         raise IngestError("No readable text found. This may be a scanned PDF.")
-    doc_id = uuid.uuid4().hex[:8]
+    # A document from a link keeps the same id every time it is imported, so saved links to it survive a restart.
+    doc_id = hashlib.md5(source_url.encode("utf-8")).hexdigest()[:8] if source_url else uuid.uuid4().hex[:8]
     chunks = _relabel_unstructured(chunk_pages(doc_id, pages))
     if not chunks:
         raise IngestError("Could not split this document into sections.")
