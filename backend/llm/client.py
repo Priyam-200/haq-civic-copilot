@@ -50,7 +50,7 @@ THINKING = os.getenv("LLM_THINKING", "fast")        # "default" keeps the models
 _think_mode = {}                                    # model -> "off" | "low" | "default"
 
 
-TIMEOUT = float(os.getenv("LLM_TIMEOUT", "45"))     # a model that stalls is given up on, so the next one is tried
+TIMEOUT = float(os.getenv("LLM_TIMEOUT", "25"))     # a model that stalls is given up on, so the next one is tried
 
 
 def _config(json_mode: bool, mode: str):

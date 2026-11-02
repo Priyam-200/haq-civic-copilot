@@ -167,8 +167,9 @@ def _seed_catalog():
                 continue
             try:
                 title, pages, _ = load_url(c["url"])
-                ingest_pages(pages, title, "web", c["url"])
+                doc = ingest_pages(pages, c["name"].split(" (")[0], "web", c["url"])
                 print(f"[seed] imported {c['key']}")
+                explain_document(doc["doc_id"], "English", "citizen")      # warm the cache: first visitors see it at once
             except Exception as e:
                 print(f"[seed] could not import {c['key']}: {str(e)[:120]}")
 
