@@ -11,10 +11,14 @@ export class ApiError extends Error {
 
 async function request(path, options = {}) {
   let res;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 120000);   // never spin forever: give up after 2 minutes
   try {
-    res = await fetch(BASE + path, options);
+    res = await fetch(BASE + path, { ...options, signal: options.signal || ctl.signal });
   } catch {
     throw new ApiError(t("err.network"), 0);
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) {
     let msg = t("err.generic", { status: res.status });

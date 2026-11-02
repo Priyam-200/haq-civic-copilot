@@ -50,8 +50,12 @@ THINKING = os.getenv("LLM_THINKING", "fast")        # "default" keeps the models
 _think_mode = {}                                    # model -> "off" | "low" | "default"
 
 
+TIMEOUT = float(os.getenv("LLM_TIMEOUT", "45"))     # a model that stalls is given up on, so the next one is tried
+
+
 def _config(json_mode: bool, mode: str):
-    kw = dict(response_mime_type="application/json" if json_mode else "text/plain", temperature=0)
+    kw = dict(response_mime_type="application/json" if json_mode else "text/plain", temperature=0,
+              http_options=types.HttpOptions(timeout=int(TIMEOUT * 1000)))
     if mode == "off":
         kw["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
     elif mode == "low":
@@ -100,7 +104,8 @@ def embed(texts: list[str], retries: int = 4) -> list[list[float]]:
         batch = texts[i:i + 50]
         for attempt in range(retries):
             try:
-                r = client.models.embed_content(model=EMBED_MODEL, contents=batch)
+                r = client.models.embed_content(model=EMBED_MODEL, contents=batch,
+                                                config=types.EmbedContentConfig(http_options=types.HttpOptions(timeout=int(TIMEOUT * 1000))))
                 out += [e.values for e in r.embeddings]
                 break
             except Exception as e:
